@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LnkStash</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2314d09a'/><text x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='monospace' font-weight='700' font-size='15' fill='%23000'>Ls</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg-deep:#0d0d0f; --bg-card:#161719; --bg-card-hover:#1c1e21; --bg-input:#111214;
+    --border:#242628; --border-active:#2e7d5e; --teal:#14d09a;
+    --teal-glow:rgba(20,208,154,0.12); --teal-glow-soft:rgba(20,208,154,0.06);
+    --text-primary:#e8eaed; --text-secondary:#7a7e85; --text-muted:#4a4e55; --red:#f03e3e;
+  }
+  body.light-mode {
+    --bg-deep:#f4f5f7; --bg-card:#ffffff; --bg-card-hover:#f0f1f3; --bg-input:#eceef1;
+    --border:#dde0e6; --border-active:#2e7d5e; --teal:#0fa87c;
+    --teal-glow:rgba(15,168,124,0.1); --teal-glow-soft:rgba(15,168,124,0.05);
+    --text-primary:#111214; --text-secondary:#4a4e55; --text-muted:#9aa0ab; --red:#e03131;
+  }
+  body.light-mode body::before { background-image:linear-gradient(rgba(15,168,124,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(15,168,124,0.04) 1px,transparent 1px); }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'IBM Plex Sans',sans-serif; background:var(--bg-deep); color:var(--text-primary); min-height:100vh; overflow-x:hidden; }
+  body::before { content:''; position:fixed; inset:0; background-image:linear-gradient(rgba(20,208,154,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(20,208,154,0.03) 1px,transparent 1px); background-size:40px 40px; pointer-events:none; z-index:0; }
+
+  /* AUTH */
+  #authScreen { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:100; background:var(--bg-deep); }
+  .auth-box { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; width:400px; max-width:95vw; padding:36px 32px; }
+  .auth-logo { display:flex; align-items:center; gap:10px; margin-bottom:28px; justify-content:center; }
+  .auth-logo-icon { width:32px; height:32px; background:var(--teal); border-radius:8px; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:13px; color:#000; }
+  .auth-logo-text { font-family:'IBM Plex Mono',monospace; font-size:16px; font-weight:600; }
+  .auth-tabs { display:flex; gap:2px; background:var(--bg-deep); border-radius:8px; padding:3px; margin-bottom:24px; }
+  .auth-tab { flex:1; text-align:center; padding:7px; border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:12px; cursor:pointer; color:var(--text-muted); transition:all .15s; border:none; background:none; }
+  .auth-tab.active { background:var(--bg-card); color:var(--text-primary); box-shadow:0 1px 4px rgba(0,0,0,.3); }
+  .auth-label { display:block; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-secondary); margin-bottom:6px; }
+  .auth-input { width:100%; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--text-primary); font-family:'IBM Plex Sans',sans-serif; font-size:13px; outline:none; transition:border-color .15s; margin-bottom:14px; }
+  .auth-input:focus { border-color:var(--border-active); }
+  .auth-input::placeholder { color:var(--text-muted); }
+  .auth-btn { width:100%; padding:11px; border-radius:8px; border:none; background:var(--teal); color:#000; font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600; cursor:pointer; transition:all .15s; margin-bottom:12px; }
+  .auth-btn:hover { background:#18e8ac; }
+  .auth-btn:disabled { opacity:.5; cursor:not-allowed; }
+  .auth-divider { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .auth-divider-line { flex:1; height:1px; background:var(--border); }
+  .auth-divider-text { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text-muted); }
+  .auth-google-btn { width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg-input); color:var(--text-primary); font-family:'IBM Plex Mono',monospace; font-size:12px; cursor:pointer; transition:all .15s; display:flex; align-items:center; justify-content:center; gap:10px; }
+  .auth-google-btn:hover { border-color:var(--text-secondary); }
+  .auth-error { background:rgba(240,62,62,.1); border:1px solid rgba(240,62,62,.3); border-radius:6px; padding:9px 12px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:#ff6b6b; margin-bottom:12px; display:none; }
+  .auth-success { background:rgba(20,208,154,.1); border:1px solid var(--border-active); border-radius:6px; padding:9px 12px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--teal); margin-bottom:12px; display:none; }
+
+  /* SIDEBAR */
+  .sidebar { position:fixed; left:0; top:0; bottom:0; width:220px; background:var(--bg-card); border-right:1px solid var(--border); display:flex; flex-direction:column; z-index:10; overflow:hidden; }
+  .sidebar-logo { padding:20px 20px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+  .logo-icon { width:28px; height:28px; background:var(--teal); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:12px; color:#000; flex-shrink:0; }
+  .logo-text { font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; }
+  .sidebar-section { padding:16px 12px 8px; }
+  .sidebar-label { font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:500; color:var(--text-muted); letter-spacing:.08em; text-transform:uppercase; padding:0 8px; margin-bottom:6px; }
+  .sidebar-item { display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:6px; cursor:pointer; font-size:13px; color:var(--text-secondary); transition:all .15s; border:1px solid transparent; margin-bottom:1px; width:100%; text-align:left; background:none; font-family:inherit; -webkit-tap-highlight-color:transparent; }
+  .sidebar-item:hover { background:var(--bg-card-hover); color:var(--text-primary); }
+  .sidebar-item.active { background:var(--teal-glow); color:var(--teal); border-color:var(--border-active); }
+  .sidebar-item .dot { width:7px; height:7px; border-radius:50%; background:var(--text-muted); flex-shrink:0; }
+  .sidebar-item.active .dot { background:var(--teal); box-shadow:0 0 6px var(--teal); }
+  .sidebar-count { margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:10px; background:var(--bg-deep); border:1px solid var(--border); color:var(--text-muted); padding:1px 6px; border-radius:99px; }
+  .sidebar-tags-wrap { flex:1; overflow-y:auto; padding:0 12px 10px; }
+  .sidebar-tags-wrap::-webkit-scrollbar { width:3px; }
+  .sidebar-tags-wrap::-webkit-scrollbar-thumb { background:var(--border); border-radius:99px; }
+  .sidebar-bottom { padding:12px; border-top:1px solid var(--border); }
+  .user-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .user-avatar { width:26px; height:26px; border-radius:50%; background:var(--teal-glow); border:1px solid var(--border-active); display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--teal); flex-shrink:0; }
+  .user-email { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .signout-btn { background:none; border:1px solid var(--border); border-radius:5px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; font-size:10px; padding:3px 7px; cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .signout-btn:hover { border-color:var(--red); color:var(--red); }
+  .status-row { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; }
+  .settings-btn { width:100%; margin-top:8px; background:none; border:1px solid var(--border); border-radius:6px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; font-size:11px; padding:6px 10px; cursor:pointer; text-align:left; transition:all .15s; }
+  .settings-btn:hover { border-color:var(--text-muted); color:var(--text-primary); }
+  .theme-btn { flex:1; padding:8px; border-radius:7px; border:1px solid var(--border); background:var(--bg-input); color:var(--text-secondary); font-family:'IBM Plex Mono',monospace; font-size:12px; cursor:pointer; transition:all .15s; }
+  .theme-btn:hover { border-color:var(--text-muted); }
+  .theme-btn.active { border-color:var(--teal); color:var(--teal); background:var(--teal-glow); }
+  .status-dot { width:6px; height:6px; border-radius:50%; background:var(--teal); box-shadow:0 0 6px var(--teal); animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* MAIN */
+  .main { margin-left:220px; min-height:100vh; position:relative; z-index:1; }
+  .topbar { height:56px; border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 28px; gap:14px; background:rgba(13,13,15,.8); backdrop-filter:blur(12px); position:sticky; top:0; z-index:5; }
+  .search-wrap { flex:1; max-width:400px; position:relative; }
+  .search-wrap svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-muted); width:14px; height:14px; }
+  .search-input { width:100%; background:var(--bg-input); border:1px solid var(--border); border-radius:7px; padding:7px 12px 7px 32px; color:var(--text-primary); font-family:'IBM Plex Mono',monospace; font-size:12px; outline:none; transition:border-color .15s; }
+  .search-input::placeholder { color:var(--text-muted); }
+  .search-input:focus { border-color:var(--border-active); }
+  .topbar-actions { margin-left:auto; display:flex; gap:8px; }
+  .btn { display:flex; align-items:center; gap:6px; padding:7px 14px; border-radius:7px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-secondary); font-family:'IBM Plex Mono',monospace; font-size:12px; cursor:pointer; transition:all .15s; }
+  .btn:hover { border-color:var(--text-muted); color:var(--text-primary); }
+  .btn-primary { background:var(--teal); color:#000; border-color:var(--teal); font-weight:600; }
+  .btn-primary:hover { background:#18e8ac; border-color:#18e8ac; color:#000; }
+  .content { padding:28px; }
+  .page-header { margin-bottom:24px; }
+  .page-title { font-size:22px; font-weight:600; letter-spacing:-.4px; }
+  .page-subtitle { font-size:13px; color:var(--text-secondary); margin-top:4px; }
+  .filters { display:flex; gap:6px; margin-bottom:22px; flex-wrap:wrap; }
+  .filter-tag { display:flex; align-items:center; gap:5px; padding:5px 11px; border-radius:99px; border:1px solid var(--border); background:var(--bg-card); font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-secondary); cursor:pointer; transition:all .15s; }
+  .filter-tag:hover { border-color:var(--text-muted); color:var(--text-primary); }
+  .filter-tag.active { border-color:var(--teal); color:var(--teal); background:var(--teal-glow); }
+  .filter-tag .tag-dot { width:5px; height:5px; border-radius:50%; }
+  .cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px; }
+  .card { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:18px; cursor:pointer; transition:all .2s; position:relative; overflow:hidden; animation:cardIn .3s ease both; }
+  @keyframes cardIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,var(--teal-glow),transparent); opacity:0; transition:opacity .2s; }
+  .card:hover { border-color:#2e3033; background:var(--bg-card-hover); transform:translateY(-1px); box-shadow:0 8px 24px rgba(0,0,0,.3); }
+  .card:hover::before { opacity:1; }
+  .card-top { display:flex; align-items:flex-start; gap:12px; margin-bottom:14px; }
+  .card-favicon { width:36px; height:36px; border-radius:8px; background:var(--bg-deep); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+  .card-meta { flex:1; min-width:0; }
+  .card-title { font-size:14px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:3px; }
+  .card-url { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card-type-badge { font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:500; padding:3px 8px; border-radius:99px; flex-shrink:0; }
+  .badge-doc { background:rgba(59,91,219,.15); color:#748ffc; border:1px solid rgba(59,91,219,.3); }
+  .badge-social { background:rgba(121,80,242,.15); color:#b197fc; border:1px solid rgba(121,80,242,.3); }
+  .badge-app { background:rgba(15,168,118,.15); color:var(--teal); border:1px solid rgba(15,168,118,.3); }
+  .badge-link { background:rgba(232,89,12,.15); color:#ff922b; border:1px solid rgba(232,89,12,.3); }
+  .card-notes { font-size:12px; color:var(--text-secondary); line-height:1.55; margin-bottom:14px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .card-footer { display:flex; align-items:center; justify-content:space-between; padding-top:12px; border-top:1px solid var(--border); }
+  .card-tags { display:flex; gap:5px; flex-wrap:wrap; }
+  .tag-pill { font-family:'IBM Plex Mono',monospace; font-size:10px; padding:2px 7px; border-radius:4px; background:var(--bg-deep); border:1px solid var(--border); color:var(--text-muted); }
+  .card-date { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text-muted); }
+  .card-status { display:flex; align-items:center; gap:5px; font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--teal); }
+  .card-open-btn { background:none; border:1px solid var(--border); border-radius:5px; color:var(--text-muted); font-size:11px; padding:2px 6px; cursor:pointer; transition:all .15s; line-height:1; }
+  .card-edit-btn { background:none; border:1px solid var(--border); border-radius:5px; color:var(--text-muted); font-size:12px; padding:2px 6px; cursor:pointer; transition:all .15s; line-height:1; }
+  .card-edit-btn:hover { border-color:var(--teal); color:var(--teal); background:var(--teal-glow); }
+  .card-del-btn { background:none; border:1px solid var(--border); border-radius:5px; color:var(--text-muted); font-size:11px; padding:2px 6px; cursor:pointer; transition:all .15s; line-height:1; }
+  .card-del-btn:hover { border-color:var(--red); color:var(--red); background:rgba(240,62,62,.08); }
+  .card-fav-btn { background:none; border:1px solid var(--border); border-radius:5px; color:var(--text-muted); font-size:13px; padding:1px 5px; cursor:pointer; transition:all .15s; line-height:1; }
+  .card-fav-btn:hover { border-color:#ffd43b; color:#ffd43b; }
+  .card-fav-btn[data-fav="1"] { color:#ffd43b; border-color:#ffd43b; background:rgba(255,212,59,.08); }
+  .card-open-btn:hover { border-color:var(--teal); color:var(--teal); background:var(--teal-glow); }
+  .card-status-dot { width:5px; height:5px; border-radius:50%; background:var(--teal); box-shadow:0 0 4px var(--teal); }
+  .empty-state { grid-column:1/-1; text-align:center; padding:60px 20px; color:var(--text-muted); }
+  .stats-ticker-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px; position:relative; overflow:hidden; }
+  .stats-ticker-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(20,208,154,.2),transparent); }
+  .stats-ticker-top { display:flex; align-items:flex-start; justify-content:space-between; }
+  .stats-pair-label { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text-muted); letter-spacing:.1em; margin-bottom:6px; }
+  .stats-live-dot { width:6px; height:6px; border-radius:50%; background:var(--teal); box-shadow:0 0 6px var(--teal); animation:pulse 2s infinite; display:inline-block; margin-left:6px; vertical-align:middle; }
+  .stats-rate { font-family:'IBM Plex Mono',monospace; font-size:42px; font-weight:700; letter-spacing:-1px; line-height:1; transition:color .3s; }
+  .stats-rate.up { color:var(--teal); } .stats-rate.down { color:#f03e3e; } .stats-rate.neutral { color:var(--text-primary); }
+  .stats-change-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:99px; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; margin-top:6px; }
+  .stats-change-badge.up { background:rgba(20,208,154,.1); color:var(--teal); border:1px solid rgba(20,208,154,.2); }
+  .stats-change-badge.down { background:rgba(240,62,62,.1); color:#f03e3e; border:1px solid rgba(240,62,62,.2); }
+  .stats-expand-btn { background:none; border:1px solid var(--border); border-radius:7px; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-muted); transition:all .2s; flex-shrink:0; }
+  .stats-expand-btn:hover { border-color:var(--teal); color:var(--teal); }
+  .stats-mini-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:18px; }
+  .stats-mini-item { background:var(--bg-deep); border:1px solid var(--border); border-radius:8px; padding:12px; }
+  .stats-mini-label { font-family:'IBM Plex Mono',monospace; font-size:9px; color:var(--text-muted); letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px; }
+  .stats-mini-value { font-family:'IBM Plex Mono',monospace; font-size:16px; font-weight:600; color:var(--text-primary); }
+  .stats-mini-sub { font-size:10px; color:var(--text-muted); margin-top:2px; }
+  .stats-chart-wrap { margin-top:18px; }
+  .stats-period-btns { display:flex; gap:4px; }
+  .stats-period-btn { background:none; border:1px solid var(--border); border-radius:5px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; font-size:10px; padding:4px 10px; cursor:pointer; transition:all .15s; }
+  .stats-period-btn.active { border-color:var(--teal); color:var(--teal); background:var(--teal-glow); }
+  .stats-last-updated { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text-muted); margin-top:10px; text-align:center; }
+  .task-card { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:8px; display:flex; align-items:flex-start; gap:12px; transition:all .2s; }
+  .task-card:hover { border-color:#2e3033; background:var(--bg-card-hover); }
+  .task-card.done { opacity:.55; }
+  .task-check { width:18px; height:18px; border-radius:5px; border:2px solid var(--border); background:none; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:all .15s; margin-top:1px; }
+  .task-check.checked { background:var(--teal); border-color:var(--teal); }
+  .task-check.checked::after { content:'✓'; color:#000; font-size:11px; font-weight:700; }
+  .task-body { flex:1; min-width:0; }
+  .task-title { font-size:14px; font-weight:500; color:var(--text-primary); margin-bottom:4px; }
+  .task-card.done .task-title { text-decoration:line-through; color:var(--text-muted); }
+  .task-notes { font-size:12px; color:var(--text-secondary); margin-bottom:6px; line-height:1.5; }
+  .task-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .task-reminder { font-family:'IBM Plex Mono',monospace; font-size:10px; color:#74c0fc; background:rgba(116,192,252,.1); border:1px solid rgba(116,192,252,.25); border-radius:4px; padding:2px 7px; }
+  .task-reminder.overdue { color:#ff6b6b; background:rgba(240,62,62,.1); border-color:rgba(240,62,62,.25); }
+  .task-actions { display:flex; gap:6px; flex-shrink:0; }
+  .empty-icon { font-size:32px; margin-bottom:12px; }
+  .empty-title { font-size:15px; color:var(--text-secondary); margin-bottom:6px; }
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.7); backdrop-filter:blur(4px); z-index:100; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .2s; }
+  .modal-overlay.open { opacity:1; pointer-events:all; }
+  .modal { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; width:520px; max-width:95vw; max-height:90vh; overflow-y:auto; transform:translateY(16px) scale(.98); transition:transform .2s; }
+  .modal-overlay.open .modal { transform:translateY(0) scale(1); }
+  .modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 20px; border-bottom:1px solid var(--border); }
+  .modal-title { font-size:14px; font-weight:600; font-family:'IBM Plex Mono',monospace; }
+  .modal-close { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; border-radius:4px; font-size:18px; line-height:1; }
+  .modal-close:hover { color:var(--text-primary); }
+  .modal-body { padding:20px; }
+  .form-row { margin-bottom:16px; }
+  .form-label { display:block; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-secondary); margin-bottom:6px; }
+  .form-input,.form-textarea,.form-select { width:100%; background:var(--bg-input); border:1px solid var(--border); border-radius:7px; padding:9px 12px; color:var(--text-primary); font-family:'IBM Plex Sans',sans-serif; font-size:13px; outline:none; transition:border-color .15s; }
+  .form-input::placeholder,.form-textarea::placeholder { color:var(--text-muted); }
+  .form-input:focus,.form-textarea:focus,.form-select:focus { border-color:var(--border-active); }
+  .form-textarea { resize:vertical; min-height:80px; line-height:1.5; }
+  .form-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .modal-footer { padding:14px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; }
+  .detail-url-bar { display:flex; align-items:center; gap:8px; background:var(--bg-deep); border:1px solid var(--border); border-radius:7px; padding:8px 12px; margin-bottom:16px; }
+  .detail-url-bar a { font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--teal); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .detail-url-bar a:hover { text-decoration:underline; }
+  .connection-line { display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--teal-glow-soft); border:1px solid var(--border-active); border-radius:7px; margin-bottom:16px; flex-wrap:wrap; }
+  .conn-badge { font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; background:var(--teal); color:#000; padding:3px 8px; border-radius:4px; }
+  .conn-pill { font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-secondary); background:var(--bg-deep); border:1px solid var(--border); padding:2px 8px; border-radius:4px; }
+  .detail-notes { font-size:13px; color:var(--text-secondary); line-height:1.6; background:var(--bg-deep); border:1px solid var(--border); border-radius:7px; padding:12px; margin-bottom:16px; white-space:pre-wrap; }
+  .loading-screen { position:fixed; inset:0; background:var(--bg-deep); display:flex; align-items:center; justify-content:center; z-index:200; flex-direction:column; gap:16px; }
+  .loading-logo { font-family:'IBM Plex Mono',monospace; font-size:18px; font-weight:600; color:var(--teal); }
+  .loading-dots { display:flex; gap:6px; }
+  .loading-dot { width:6px; height:6px; border-radius:50%; background:var(--teal); animation:ldot 1.2s infinite; }
+  .loading-dot:nth-child(2){animation-delay:.2s} .loading-dot:nth-child(3){animation-delay:.4s}
+  @keyframes ldot { 0%,80%,100%{opacity:.2;transform:scale(.8)} 40%{opacity:1;transform:scale(1)} }
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--bg-card); border:1px solid var(--border-active); border-radius:8px; padding:12px 16px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--teal); display:flex; align-items:center; gap:8px; z-index:200; transform:translateY(80px); opacity:0; transition:all .3s; }
+  .toast.show { transform:translateY(0); opacity:1; }
+  ::-webkit-scrollbar{width:4px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+
+  /* ── MOBILE NAV BAR ── */
+  .mobile-topbar { display:none; height:52px; background:rgba(13,13,15,.95); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:20; align-items:center; padding:0 16px; gap:10px; }
+  .mobile-menu-btn { background:none; border:1px solid var(--border); border-radius:7px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-secondary); flex-shrink:0; }
+  .mobile-menu-btn:active { background:var(--bg-card-hover); }
+  .mobile-logo { font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; color:var(--text-primary); }
+  .mobile-sync-btn { background:none; border:1px solid var(--border); border-radius:7px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-secondary); flex-shrink:0; transition:all .2s; }
+  .mobile-sync-btn:active { background:var(--bg-card-hover); }
+  .mobile-sync-btn.spinning svg { animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .mobile-add-btn { margin-left:auto; background:var(--teal); border:none; border-radius:7px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#000; flex-shrink:0; }
+
+  /* ── SIDEBAR DRAWER OVERLAY ── */
+  .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:30; opacity:0; transition:opacity .25s; }
+  .sidebar-overlay.open { opacity:1; }
+
+  /* ── BOTTOM NAV ── */
+  .bottom-nav { display:none; position:fixed; bottom:0; left:0; right:0; height:60px; background:var(--bg-card); border-top:1px solid var(--border); z-index:20; padding:0 8px; align-items:center; justify-content:space-around; padding-bottom:env(safe-area-inset-bottom); }
+  .bottom-nav-item { display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 12px; border-radius:8px; cursor:pointer; border:none; background:none; color:var(--text-muted); transition:all .15s; font-family:'IBM Plex Mono',monospace; font-size:9px; min-width:48px; }
+  .bottom-nav-item.active { color:var(--teal); }
+  .bottom-nav-item svg { width:18px; height:18px; }
+  .bottom-nav-item span { font-size:9px; }
+
+  /* ── MOBILE FAB ── */
+  .fab { display:none; position:fixed; bottom:72px; right:18px; width:52px; height:52px; border-radius:50%; background:var(--teal); border:none; color:#000; font-size:24px; cursor:pointer; z-index:19; box-shadow:0 4px 20px rgba(20,208,154,.35); align-items:center; justify-content:center; transition:transform .15s; }
+  .fab:active { transform:scale(.92); }
+  .add-picker { position:fixed; background:var(--bg-card); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 32px rgba(0,0,0,.4); z-index:200; overflow:hidden; opacity:0; pointer-events:none; transform:scale(.95) translateY(4px); transition:all .15s; min-width:160px; }
+  .add-picker.open { opacity:1; pointer-events:all; transform:scale(1) translateY(0); }
+  .add-picker-item { display:flex; align-items:center; gap:10px; padding:11px 16px; cursor:pointer; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-secondary); transition:background .1s; border:none; background:none; width:100%; text-align:left; }
+  .add-picker-item:hover { background:var(--bg-card-hover); color:var(--text-primary); }
+  .add-picker-item svg { flex-shrink:0; }
+
+  @media (max-width: 768px) {
+    .page-subtitle { display:none; }
+    /* hide desktop sidebar, show mobile chrome */
+    .sidebar { transform:translateX(-100%); transition:transform .25s ease; z-index:50; width:260px; }
+    .sidebar.open { transform:translateX(0); }
+    .sidebar-overlay { display:block; pointer-events:none; z-index:45; }
+    .sidebar-overlay.open { pointer-events:all; }
+    .main { margin-left:0; }
+    .topbar { display:none; }
+    .mobile-topbar { display:flex; }
+    .bottom-nav { display:flex; }
+    .fab { display:flex; }
+    .content { padding:16px 14px 80px; }
+    .page-title { font-size:18px; }
+    .page-subtitle { font-size:12px; }
+    .cards-grid { grid-template-columns:1fr; gap:10px; }
+    .filters { gap:6px; overflow-x:auto; flex-wrap:nowrap; padding-bottom:6px; padding-top:2px; -webkit-overflow-scrolling:touch; scrollbar-width:none; scroll-behavior:smooth; }
+    .filters::-webkit-scrollbar { display:none; }
+    .filter-tag { white-space:nowrap; flex-shrink:0; -webkit-tap-highlight-color:transparent; }
+
+    /* modal full screen on mobile */
+    .modal-overlay { align-items:flex-end; }
+    .modal { width:100%; max-width:100%; border-radius:16px 16px 0 0; max-height:92vh; transform:translateY(100%); }
+    .modal-overlay.open .modal { transform:translateY(0); }
+    .form-row-2 { grid-template-columns:1fr; }
+
+    /* auth screen */
+    .auth-box { border-radius:0; border:none; min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding:28px 24px; }
+
+    /* toast at top on mobile */
+    .toast { bottom:auto; top:16px; right:16px; left:16px; justify-content:center; }
+  }
+
+  @media (max-width: 400px) {
+    .content { padding:14px 12px 80px; }
+    .card { padding:14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-logo">LnkStash</div>
+  <div class="loading-dots"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>
+</div>
+
+<div id="authScreen" style="display:none">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">Ls</div>
+      <span class="auth-logo-text">LnkStash</span>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabSignin" onclick="switchTab('signin')">Sign In</button>
+      <button class="auth-tab" id="tabSignup" onclick="switchTab('signup')">Create Account</button>
+    </div>
+    <div id="authError" class="auth-error"></div>
+    <div id="authSuccess" class="auth-success"></div>
+    <label class="auth-label">Email</label>
+    <input class="auth-input" id="authEmail" type="email" placeholder="you@example.com" autocomplete="email">
+    <label class="auth-label">Password</label>
+    <input class="auth-input" id="authPassword" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password">
+    <button class="auth-btn" id="authSubmitBtn" onclick="handleAuth()">Sign In</button>
+    <div class="auth-divider"><div class="auth-divider-line"></div><div class="auth-divider-text">or</div><div class="auth-divider-line"></div></div>
+    <button class="auth-google-btn" onclick="handleGoogle()">
+      <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Continue with Google
+    </button>
+  </div>
+</div>
+
+<div id="appScreen" style="display:none">
+
+  <!-- SIDEBAR OVERLAY (mobile) -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">Ls</div>
+      <span class="logo-text">LnkStash</span>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Library</div>
+      <button class="sidebar-item active" id="nav-all" onclick="switchSection('all')"><span class="dot"></span>All Links<span class="sidebar-count" id="count-all">0</span></button>
+      <button class="sidebar-item" id="nav-favorites" onclick="switchSection('favorites')"><span class="dot" style="background:#ffd43b"></span>Favorites<span class="sidebar-count" id="count-favorites">0</span></button>
+      <button class="sidebar-item" id="nav-doc" onclick="switchSection('doc')"><span class="dot" style="background:#748ffc"></span>Docs<span class="sidebar-count" id="count-doc">0</span></button>
+      <button class="sidebar-item" id="nav-app" onclick="switchSection('app')"><span class="dot" style="background:var(--teal)"></span>Apps<span class="sidebar-count" id="count-app">0</span></button>
+      <button class="sidebar-item" id="nav-social" onclick="switchSection('social')"><span class="dot" style="background:#b197fc"></span>Social<span class="sidebar-count" id="count-social">0</span></button>
+      <button class="sidebar-item" id="nav-link" onclick="switchSection('link')"><span class="dot" style="background:#ff922b"></span>Links<span class="sidebar-count" id="count-link">0</span></button>
+    </div>
+    <div class="sidebar-section" style="padding-top:8px">
+      <div class="sidebar-label">Tasks</div>
+      <button class="sidebar-item" id="nav-tasks" onclick="switchSection('tasks')"><span class="dot" style="background:#69db7c"></span>All Tasks<span class="sidebar-count" id="count-tasks">0</span></button>
+      <button class="sidebar-item" id="nav-tasks-pending" onclick="switchSection('tasks-pending')"><span class="dot" style="background:#74c0fc"></span>Pending<span class="sidebar-count" id="count-tasks-pending">0</span></button>
+      <button class="sidebar-item" id="nav-tasks-done" onclick="switchSection('tasks-done')"><span class="dot" style="background:#4a4e55"></span>Completed<span class="sidebar-count" id="count-tasks-done">0</span></button>
+    </div>
+    <div class="sidebar-tags-wrap">
+      <div class="sidebar-label" style="padding:0 8px;margin-bottom:6px">Tags</div>
+      <div id="sidebarTags"></div>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="user-row">
+        <div class="user-avatar" id="userAvatar">?</div>
+        <div class="user-email" id="userEmail">—</div>
+        <button class="signout-btn" onclick="signOut()">out</button>
+      </div>
+      <div class="status-row"><div class="status-dot"></div>synced</div>
+      <button class="settings-btn" onclick="openSettings()">⚙ Settings</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- MOBILE TOP BAR -->
+    <div class="mobile-topbar">
+      <button class="mobile-menu-btn" onclick="openSidebar()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+      <span class="mobile-logo">LnkStash</span>
+      <button class="mobile-sync-btn" id="syncBtn" onclick="syncAll()" title="Sync">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 8a7 7 0 0 1 12-4.9M15 8a7 7 0 0 1-12 4.9"/><path d="M13 3l0 3-3 0M3 13l0-3 3 0"/></svg>
+      </button>
+      <button class="mobile-add-btn" onclick="toggleAddPicker(event)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v12M2 8h12"/></svg>
+      </button>
+    </div>
+    <!-- MOBILE SEARCH BAR -->
+    <div id="mobileSearchBar" style="display:none;padding:10px 14px;background:var(--bg-card);border-bottom:1px solid var(--border);position:sticky;top:52px;z-index:15">
+      <div style="position:relative">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);width:15px;height:15px;pointer-events:none"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10.5 10.5l3 3"/></svg>
+        <input class="search-input" id="mobileSearchInput" placeholder="Search links, notes, tags..."
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          oninput="document.getElementById('searchInput').value=this.value;currentSection==='tasks'?renderTasks():renderCards()"
+          style="width:100%;padding:11px 12px 11px 36px;font-size:16px">
+      </div>
+    </div>
+    <div class="topbar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10.5 10.5l3 3"/></svg>
+        <input class="search-input" id="searchInput" placeholder="Search links, notes, tags..." oninput="currentSection==='tasks'?renderTasks():renderCards()">
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary" id="topbarAddBtn" onclick="toggleAddPicker(event)">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 1v10M1 6h10"/></svg>
+          <span id="topbarAddLabel">Add</span>
+        </button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="page-header">
+        <div class="page-title" id="pageTitle">All Links</div>
+        <div class="page-subtitle" id="pageSubtitle">Your saved resources, synced across all devices</div>
+      </div>
+      <div class="filters" id="filtersBar">
+        <div class="filter-tag" id="filter-favorites" onclick="filterType('favorites')"><span class="tag-dot" style="background:#ffd43b"></span>Favorites</div>
+      </div>
+      <div class="cards-grid" id="cardsGrid"></div>
+      <!-- TASKS SECTION -->
+      <!-- STATS SECTION -->
+      <div id="statsSection" style="display:none">
+        <!-- TICKER CARD -->
+        <div class="stats-ticker-card" id="statsTickerCard">
+          <div class="stats-ticker-top">
+            <div>
+              <div class="stats-pair-label">USD / ILS <span class="stats-live-dot"></span></div>
+              <div class="stats-rate" id="statsRate">—</div>
+              <div id="statsChangeLine"></div>
+            </div>
+            <button class="stats-expand-btn" id="statsExpandBtn" onclick="toggleStatsExpand()" title="Expand">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" id="statsExpandIcon"><path d="M4 6l4 4 4-4"/></svg>
+            </button>
+          </div>
+          <!-- EXPANDED CONTENT -->
+          <div id="statsExpanded" style="display:none">
+            <div class="stats-mini-grid" id="statsMiniGrid"></div>
+            <div class="stats-chart-wrap">
+              <div class="stats-period-btns">
+                <button class="stats-period-btn active" onclick="loadStatsChart(7,this)">1W</button>
+                <button class="stats-period-btn" onclick="loadStatsChart(30,this)">1M</button>
+                <button class="stats-period-btn" onclick="loadStatsChart(90,this)">3M</button>
+                <button class="stats-period-btn" onclick="loadStatsChart(365,this)">1Y</button>
+              </div>
+              <div style="position:relative;height:180px;margin-top:12px">
+                <canvas id="statsChart"></canvas>
+              </div>
+            </div>
+            <div class="stats-last-updated" id="statsLastUpdated"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tasksSection" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-muted)" id="tasksStatusLine">0 pending · 0 done</div>
+          <button class="btn btn-primary" onclick="openAddTask()" style="font-size:11px;padding:6px 12px">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 1v10M1 6h10"/></svg>
+            Add Task
+          </button>
+        </div>
+        <div id="tasksGrid"></div>
+      </div>
+    </div>
+    </main>
+
+  <!-- ADD TASK MODAL -->
+  <div class="modal-overlay" id="taskModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title" id="taskModalTitle">// add_task</span>
+        <button class="modal-close" onclick="closeTaskModal()">x</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row"><label class="form-label">Task *</label><input class="form-input" id="t-title" placeholder="What needs to be done?"></div>
+        <div class="form-row"><label class="form-label">Notes</label><textarea class="form-textarea" id="t-notes" placeholder="Details..."></textarea></div>
+        <div class="form-row"><label class="form-label">Tags (comma separated)</label><input class="form-input" id="t-tags" placeholder="home, work, shopping..."></div>
+        <div class="form-row"><label class="form-label">Reminder</label><input class="form-input" id="t-reminder" type="datetime-local"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="deleteTaskBtn" style="color:#f03e3e;border-color:rgba(240,62,62,.2);display:none" onclick="deleteCurrentTask()">Delete</button>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn" onclick="closeTaskModal()">Cancel</button>
+          <button class="btn btn-primary" id="saveTaskBtn" onclick="saveTask()">Save Task</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal" style="max-width:360px">
+      <div class="modal-header">
+        <span class="modal-title">// settings</span>
+        <button class="modal-close" onclick="closeSettings()">x</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label class="form-label">Appearance</label>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="theme-btn" id="theme-dark" onclick="setTheme('dark')">🌙 Dark</button>
+            <button class="theme-btn" id="theme-light" onclick="setTheme('light')">☀️ Light</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:20px">
+          <label class="form-label">Account</label>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-secondary);margin-top:6px;margin-bottom:10px" id="settingsEmail">—</div>
+          <button class="btn" style="width:100%;color:#f03e3e;border-color:rgba(240,62,62,.2)" onclick="signOut();closeSettings()">Sign Out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV (mobile) -->
+  <nav class="bottom-nav">
+    <button class="bottom-nav-item active" id="bnav-cards" onclick="bnavCards()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+      <span>Cards</span>
+    </button>
+    <button class="bottom-nav-item" id="bnav-tasks" onclick="bnavTasks()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="11" rx="2"/><path d="M4 7l2 2 4-4"/></svg>
+      <span>Tasks</span>
+    </button>
+    <button class="bottom-nav-item" id="bnav-stats" onclick="bnavStats()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14V9m4 5V6m4 8V3m4 11V7"/></svg>
+      <span>Stats</span>
+    </button>
+    <button class="bottom-nav-item" id="bnav-favorites" onclick="bnavFavorites()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2l1.8 3.6L14 6.5l-3 2.9.7 4.1L8 11.4l-3.7 2.1.7-4.1-3-2.9 4.2-.9z"/></svg>
+      <span>Favorites</span>
+    </button>
+    <button class="bottom-nav-item" id="bnav-search" onclick="bnavSearch()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10.5 10.5l3 3"/></svg>
+      <span>Search</span>
+    </button>
+  </nav>
+
+  <!-- FAB (mobile) -->
+  <button class="fab" id="fabBtn" onclick="toggleAddPicker(event)">+</button>
+
+  <!-- ADD PICKER DROPDOWN -->
+  <div class="add-picker" id="addPicker">
+    <button class="add-picker-item" onclick="closePicker();openAdd()">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h8a1 1 0 001-1V7M7 1h4m0 0v4m0-4L5 7"/></svg>
+      Add Link
+    </button>
+    <button class="add-picker-item" onclick="closePicker();openAddTask()">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="3" width="14" height="11" rx="2"/><path d="M5 7l2 2 4-4"/></svg>
+      Add Task
+    </button>
+  </div>
+
+</div>
+
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="addModalTitle">// add_new_link</span>
+      <button class="modal-close" onclick="closeAdd()">x</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row"><label class="form-label">URL *</label><input class="form-input" id="f-url" placeholder="https://..." oninput="autoFillTitle()" onblur="fetchMeta()"></div>
+      <div class="form-row-2">
+        <div class="form-row" style="margin:0"><label class="form-label">Title</label><input class="form-input" id="f-title" placeholder="Resource title"></div>
+        <div class="form-row" style="margin:0"><label class="form-label">Type</label><select class="form-select" id="f-type"><option value="link">Link</option><option value="doc">Doc</option><option value="app">App</option><option value="social">Social</option></select></div>
+      </div>
+      <div class="form-row"><label class="form-label">Notes</label><textarea class="form-textarea" id="f-notes" placeholder="Why you saved this..."></textarea></div>
+      <div class="form-row"><label class="form-label">Tags (comma separated)</label><input class="form-input" id="f-tags" placeholder="react, design, reference..."></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="deleteEditBtn" style="color:#f03e3e;border-color:rgba(240,62,62,.2);display:none" onclick="deleteCurrentEdit()">Delete</button>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn" onclick="closeAdd()">Cancel</button>
+        <button class="btn btn-primary" id="saveBtn" onclick="saveLink()">Save Link</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="d-title-header">// link_detail</span>
+      <button class="modal-close" onclick="closeDetail()">x</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer" id="detailFooter"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg>
+  <span id="toastMsg">Saved</span>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://vvvhwdbpyjrfwnubijxg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2dmh3ZGJweWpyZndudWJpanhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMjYwMDMsImV4cCI6MjA4ODgwMjAwM30.IVXBEjUn4uxXtN70_3DVvdki8tWzmUi8yAyn4rdLt1k';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    lock: (name, acquireTimeout, fn) => fn()
+  }
+});
+
+const EMOJIS = { doc:'📄', app:'⚡', social:'💬', link:'🔗' };
+const TYPE_LABELS = { doc:'Doc', app:'App', social:'Social', link:'Link' };
+
+let links = [];
+let tasks = [];
+let currentUser = null;
+let currentFilter = 'all';
+let currentSection = 'links'; // 'links' or 'tasks'
+let tasksFilter = 'all'; // 'all', 'pending', 'done'
+let editingId = null;
+let editingTaskId = null;
+let favorites = new Set();
+
+async function toggleFavorite(id, e) {
+  e.stopPropagation();
+  const isFav = favorites.has(id);
+  if (isFav) { favorites.delete(id); } else { favorites.add(id); }
+  renderCards();
+  renderFiltersBar();
+  renderSidebarTags();
+  await refreshSession();
+  const { error } = await sb.from('links').update({ favorited: !isFav }).eq('id', id).eq('user_id', currentUser.id);
+  if (error) {
+    // revert on error
+    if (!isFav) { favorites.delete(id); } else { favorites.add(id); }
+    renderCards(); renderFiltersBar(); renderSidebarTags();
+    showToast('Error saving favorite');
+  }
+}
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) { await bootApp(session.user); } else { showAuth(); }
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session?.user) { await bootApp(session.user); }
+    else if (event === 'SIGNED_OUT') { showAuth(); }
+  });
+}
+
+async function bootApp(user) {
+  currentUser = user;
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+  const email = user.email || '';
+  document.getElementById('userEmail').textContent = email;
+  document.getElementById('userAvatar').textContent = email.charAt(0).toUpperCase();
+  await loadLinks();
+  sb.channel('links-changes-' + user.id)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'links', filter: 'user_id=eq.' + user.id }, () => { loadLinks(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: 'user_id=eq.' + user.id }, () => { loadTasks(); })
+    .subscribe();
+  await loadTasks();
+  scheduleReminderChecks();
+}
+
+function showAuth() {
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('appScreen').style.display = 'none';
+}
+
+let authMode = 'signin';
+function switchTab(mode) {
+  authMode = mode;
+  document.getElementById('tabSignin').classList.toggle('active', mode === 'signin');
+  document.getElementById('tabSignup').classList.toggle('active', mode === 'signup');
+  document.getElementById('authSubmitBtn').textContent = mode === 'signin' ? 'Sign In' : 'Create Account';
+  document.getElementById('authError').style.display = 'none';
+  document.getElementById('authSuccess').style.display = 'none';
+}
+
+async function handleAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const btn = document.getElementById('authSubmitBtn');
+  const errEl = document.getElementById('authError');
+  const sucEl = document.getElementById('authSuccess');
+  errEl.style.display = 'none'; sucEl.style.display = 'none';
+  if (!email || !password) { errEl.textContent = 'Please enter email and password.'; errEl.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Please wait...';
+  let error;
+  if (authMode === 'signup') {
+    const { error: e } = await sb.auth.signUp({ email, password });
+    error = e;
+    if (!e) { sucEl.textContent = 'Account created! Check your email to confirm, then sign in.'; sucEl.style.display = 'block'; switchTab('signin'); }
+  } else {
+    const { error: e } = await sb.auth.signInWithPassword({ email, password });
+    error = e;
+  }
+  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; }
+  btn.disabled = false;
+  btn.textContent = authMode === 'signin' ? 'Sign In' : 'Create Account';
+}
+
+async function handleGoogle() {
+  const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+  if (error) { const e = document.getElementById('authError'); e.textContent = error.message; e.style.display = 'block'; }
+}
+
+async function signOut() { await sb.auth.signOut(); links = []; currentUser = null; }
+
+function openSettings() {
+  document.getElementById('settingsEmail').textContent = currentUser?.email || '—';
+  const theme = localStorage.getItem('lnkstash-theme') || 'dark';
+  document.getElementById('theme-dark').classList.toggle('active', theme === 'dark');
+  document.getElementById('theme-light').classList.toggle('active', theme === 'light');
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings() { document.getElementById('settingsModal').classList.remove('open'); }
+
+function setTheme(theme) {
+  localStorage.setItem('lnkstash-theme', theme);
+  applyTheme(theme);
+  document.getElementById('theme-dark').classList.toggle('active', theme === 'dark');
+  document.getElementById('theme-light').classList.toggle('active', theme === 'light');
+}
+function applyTheme(theme) {
+  document.body.classList.toggle('light-mode', theme === 'light');
+}
+// Apply saved theme on load
+applyTheme(localStorage.getItem('lnkstash-theme') || 'dark');
+
+async function refreshSession() {
+  try {
+    const { data: { session }, error } = await sb.auth.getSession();
+    if (error || !session) {
+      const { data: refreshed } = await sb.auth.refreshSession();
+      if (refreshed?.session?.user) { currentUser = refreshed.session.user; return true; }
+      return false;
+    }
+    currentUser = session.user;
+    return true;
+  } catch(e) { return false; }
+}
+
+async function loadLinks() {
+  const ok = await refreshSession();
+  if (!ok) { showToast('Session expired — please sign in again'); showAuth(); return; }
+  const { data, error } = await sb.from('links').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+  if (!error) {
+    links = data || [];
+    favorites = new Set(links.filter(l => l.favorited).map(l => l.id));
+    renderCards();
+    if (currentSection === 'tag') renderTasks();
+  }
+  else { console.error('loadLinks error:', error); }
+}
+
+async function saveLink() {
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  try {
+    let url = document.getElementById('f-url').value.trim();
+    if (!url) { showToast('URL is required'); btn.disabled=false; btn.textContent='Save Link'; return; }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) { url = 'https://' + url; }
+    const sessionOk = await refreshSession();
+    if (!sessionOk) { alert('Session expired — please refresh the page'); btn.disabled=false; btn.textContent='Save Link'; return; }
+    const title = document.getElementById('f-title').value.trim() || getDomain(url);
+    const tags = document.getElementById('f-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+    const payload = {
+      url: url,
+      title: title || url,
+      type: document.getElementById('f-type').value || 'link',
+      notes: document.getElementById('f-notes').value.trim() || null,
+      tags: tags,
+      favorited: editingId ? (favorites.has(editingId) || false) : false,
+      user_id: currentUser.id
+    };
+    console.log('Saving payload:', payload);
+    if (editingId) {
+      const res = await sb.from('links').update(payload).eq('id', editingId).eq('user_id', currentUser.id);
+      console.log('Update result:', res);
+      if (res.error) throw res.error;
+      showToast('Link updated');
+    } else {
+      const res = await sb.from('links').insert([payload]);
+      console.log('Insert result:', res);
+      if (res.error) throw res.error;
+      showToast('Link saved');
+    }
+    editingId = null;
+    btn.disabled = false;
+    btn.textContent = 'Save Link';
+    closeAdd();
+    await loadLinks();
+  } catch (err) {
+    console.error('Save error full:', err);
+    const msg = err.message || err.details || err.hint || JSON.stringify(err);
+    alert('Save failed: ' + msg);
+    showToast('Error: ' + msg);
+    btn.disabled = false;
+    btn.textContent = 'Save Link';
+  }
+}
+
+
+async function deleteLink(id) {
+  await refreshSession();
+  const { error } = await sb.from('links').delete().eq('id', id).eq('user_id', currentUser.id);
+  if (!error) { showToast('Link removed'); closeDetail(); await loadLinks(); }
+  else { showToast('Error: ' + error.message); }
+}
+
+// ── SECTION SWITCHING ────────────────────────────────────────
+function switchSection(section) {
+  closeSidebar();
+  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active'));
+  if (section === 'tasks' || section === 'tasks-pending' || section === 'tasks-done') {
+    currentSection = 'tasks';
+    currentFilter = 'tasks';
+    tasksFilter = section === 'tasks' ? 'all' : section === 'tasks-pending' ? 'pending' : 'done';
+    document.getElementById('nav-' + section)?.classList.add('active');
+    document.getElementById('cardsGrid').style.display = 'none';
+    document.getElementById('filtersBar').style.display = 'none';
+    document.getElementById('tasksSection').style.display = 'block';
+    document.getElementById('pageTitle').textContent = section === 'tasks' ? 'All Tasks' : section === 'tasks-pending' ? 'Pending' : 'Completed';
+    document.getElementById('topbarAddLabel').textContent = 'Add';
+    renderTasks();
+  } else if (section === 'stats') {
+    currentSection = 'stats';
+    currentFilter = 'stats';
+    document.getElementById('cardsGrid').style.display = 'none';
+    document.getElementById('filtersBar').style.display = 'none';
+    document.getElementById('tasksSection').style.display = 'none';
+    document.getElementById('statsSection').style.display = 'block';
+    document.getElementById('topbarAddLabel').textContent = 'Add';
+    document.getElementById('pageTitle').textContent = 'Stats';
+    document.getElementById('pageSubtitle').textContent = '';
+    loadStatsData();
+  } else {
+    // Library section (all, favorites, doc, app, social, link)
+    filterType(section);
+  }
+}
+
+function handleTopbarAdd() {
+  if (currentSection === 'tasks') { openAddTask(); } else { openAdd(); }
+}
+
+async function syncAll() {
+  const btn = document.getElementById('syncBtn');
+  if (!btn) return;
+  btn.classList.add('spinning');
+  try {
+    await Promise.all([loadLinks(), loadTasks()]);
+    showToast('Synced');
+  } catch(e) {
+    showToast('Sync failed');
+  } finally {
+    setTimeout(() => btn.classList.remove('spinning'), 600);
+  }
+}
+
+function toggleAddPicker(e) {
+  e.stopPropagation();
+  const picker = document.getElementById('addPicker');
+  const btn = e.currentTarget;
+  const rect = btn.getBoundingClientRect();
+  // Position above or below button
+  const spaceBelow = window.innerHeight - rect.bottom;
+  if (spaceBelow < 120) {
+    picker.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
+    picker.style.top = 'auto';
+  } else {
+    picker.style.top = (rect.bottom + 6) + 'px';
+    picker.style.bottom = 'auto';
+  }
+  picker.style.right = (window.innerWidth - rect.right) + 'px';
+  picker.classList.toggle('open');
+}
+
+function closePicker() {
+  document.getElementById('addPicker').classList.remove('open');
+}
+
+function setBottomNavActive(id) {
+  document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+function bnavCards() {
+  setBottomNavActive('bnav-cards');
+  switchSection('all');
+  document.getElementById('mobileSearchBar').style.display = 'none';
+}
+
+function bnavTasks() {
+  setBottomNavActive('bnav-tasks');
+  switchSection('tasks');
+  document.getElementById('mobileSearchBar').style.display = 'none';
+}
+
+function bnavStats() {
+  setBottomNavActive('bnav-stats');
+  switchSection('stats');
+}
+
+function bnavFavorites() {
+  setBottomNavActive('bnav-favorites');
+  switchSection('favorites');
+  document.getElementById('mobileSearchBar').style.display = 'none';
+}
+
+function bnavSearch() {
+  const bar = document.getElementById('mobileSearchBar');
+  const input = document.getElementById('mobileSearchInput');
+  const isOpen = bar.style.display !== 'none';
+  if (isOpen) {
+    bar.style.display = 'none';
+    input.value = '';
+    document.getElementById('searchInput').value = '';
+    renderCards();
+    document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('bnav-cards').classList.add('active');
+  } else {
+    bar.style.display = 'block';
+    setBottomNavActive('bnav-search');
+    // Must focus synchronously inside user gesture for iOS Safari
+    input.focus();
+    input.click();
+  }
+}
+
+// ── TASK CRUD ─────────────────────────────────────────────────
+async function loadTasks() {
+  const ok = await refreshSession();
+  if (!ok) return;
+  const { data, error } = await sb.from('tasks').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+  if (!error) {
+    tasks = data || [];
+    updateTaskCounts();
+    if (currentSection === 'tasks' || currentSection === 'tag') renderTasks();
+    renderSidebarTags();
+    renderFiltersBar();
+  }
+}
+
+function updateTaskCounts() {
+  document.getElementById('count-tasks').textContent = tasks.length;
+  document.getElementById('count-tasks-pending').textContent = tasks.filter(t => !t.completed).length;
+  document.getElementById('count-tasks-done').textContent = tasks.filter(t => t.completed).length;
+}
+
+async function saveTask() {
+  const btn = document.getElementById('saveTaskBtn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    const title = document.getElementById('t-title').value.trim();
+    if (!title) { showToast('Title is required'); btn.disabled=false; btn.textContent='Save Task'; return; }
+    const ok = await refreshSession();
+    if (!ok) { btn.disabled=false; btn.textContent='Save Task'; return; }
+    const tags = document.getElementById('t-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+    const reminder = document.getElementById('t-reminder').value;
+    const payload = {
+      title,
+      notes: document.getElementById('t-notes').value.trim() || null,
+      tags,
+      reminder_at: reminder ? new Date(reminder).toISOString() : null,
+      user_id: currentUser.id
+    };
+    if (editingTaskId) {
+      const { error } = await sb.from('tasks').update(payload).eq('id', editingTaskId).eq('user_id', currentUser.id);
+      if (error) throw error;
+      showToast('Task updated');
+    } else {
+      payload.completed = false;
+      const { error } = await sb.from('tasks').insert([payload]);
+      if (error) throw error;
+      showToast('Task saved');
+    }
+    editingTaskId = null;
+    closeTaskModal();
+    await loadTasks();
+  } catch(err) {
+    showToast('Error: ' + err.message);
+  }
+  btn.disabled = false; btn.textContent = 'Save Task';
+}
+
+async function toggleTask(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  await refreshSession();
+  const { error } = await sb.from('tasks').update({ completed: !task.completed }).eq('id', id).eq('user_id', currentUser.id);
+  if (!error) { await loadTasks(); }
+}
+
+async function deleteTask(id) {
+  await refreshSession();
+  const { error } = await sb.from('tasks').delete().eq('id', id).eq('user_id', currentUser.id);
+  if (!error) { showToast('Task deleted'); await loadTasks(); }
+}
+
+function deleteCurrentTask() {
+  if (!editingTaskId) return;
+  const t = tasks.find(x => x.id === editingTaskId);
+  if (confirm('Delete "' + (t ? t.title : 'this task') + '"?')) {
+    const id = editingTaskId;
+    editingTaskId = null;
+    closeTaskModal();
+    deleteTask(id);
+  }
+}
+
+function openAddTask() {
+  editingTaskId = null;
+  document.getElementById('t-title').value = '';
+  document.getElementById('t-notes').value = '';
+  document.getElementById('t-tags').value = '';
+  document.getElementById('t-reminder').value = '';
+  document.getElementById('taskModalTitle').textContent = '// add_task';
+  document.getElementById('saveTaskBtn').textContent = 'Save Task';
+  document.getElementById('deleteTaskBtn').style.display = 'none';
+  document.getElementById('taskModal').classList.add('open');
+  setTimeout(() => document.getElementById('t-title').focus(), 150);
+}
+
+function openEditTask(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  editingTaskId = id;
+  document.getElementById('t-title').value = t.title;
+  document.getElementById('t-notes').value = t.notes || '';
+  document.getElementById('t-tags').value = (t.tags||[]).join(', ');
+  document.getElementById('t-reminder').value = t.reminder_at ? new Date(t.reminder_at).toISOString().slice(0,16) : '';
+  document.getElementById('taskModalTitle').textContent = '// edit_task';
+  document.getElementById('saveTaskBtn').textContent = 'Update Task';
+  document.getElementById('deleteTaskBtn').style.display = 'block';
+  document.getElementById('taskModal').classList.add('open');
+}
+
+function closeTaskModal() { document.getElementById('taskModal').classList.remove('open'); }
+
+function renderTasks() {
+  const grid = document.getElementById('tasksGrid');
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  let filtered = tasks.filter(t => {
+    const matchFilter = currentSection === 'tag'
+      ? (t.tags||[]).includes(currentFilter.slice(4))
+      : tasksFilter === 'all' ? true : tasksFilter === 'pending' ? !t.completed : t.completed;
+    const matchSearch = !search || t.title.toLowerCase().includes(search) || (t.notes||'').toLowerCase().includes(search) || (t.tags||[]).some(tag => tag.toLowerCase().includes(search));
+    return matchFilter && matchSearch;
+  });
+
+  const pending = filtered.filter(t => !t.completed);
+  const done = filtered.filter(t => t.completed);
+  const statusLine = document.getElementById('tasksStatusLine');
+  if (statusLine) statusLine.textContent = pending.length + ' pending · ' + done.length + ' done';
+
+  grid.innerHTML = '';
+  if (!filtered.length) {
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:13px">No tasks here</div>';
+    return;
+  }
+
+  // Pending first, then done
+  [...pending, ...done].forEach(t => {
+    const card = document.createElement('div');
+    card.className = 'task-card' + (t.completed ? ' done' : '');
+
+    const check = document.createElement('div');
+    check.className = 'task-check' + (t.completed ? ' checked' : '');
+    check.addEventListener('click', () => toggleTask(t.id));
+
+    const body = document.createElement('div');
+    body.className = 'task-body';
+
+    let reminderHTML = '';
+    if (t.reminder_at) {
+      const rd = new Date(t.reminder_at);
+      const isOverdue = rd < new Date() && !t.completed;
+      reminderHTML = '<span class="task-reminder' + (isOverdue ? ' overdue' : '') + '">⏰ ' + rd.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) + '</span>';
+    }
+
+    const tagsHTML = (t.tags||[]).map(tag => '<span class="tag-pill">' + esc(tag) + '</span>').join('');
+
+    body.innerHTML =
+      '<div class="task-title">' + esc(t.title) + '</div>' +
+      (t.notes ? '<div class="task-notes">' + esc(t.notes) + '</div>' : '') +
+      '<div class="task-meta">' + reminderHTML + tagsHTML + '</div>';
+
+    const actions = document.createElement('div');
+    actions.className = 'task-actions';
+    const editBtn = document.createElement('button');
+    editBtn.className = 'card-edit-btn';
+    editBtn.textContent = '✎';
+    editBtn.title = 'Edit';
+    editBtn.addEventListener('click', () => openEditTask(t.id));
+    actions.appendChild(editBtn);
+
+    card.appendChild(check);
+    card.appendChild(body);
+    card.appendChild(actions);
+    grid.appendChild(card);
+  });
+}
+
+// ── REMINDERS ─────────────────────────────────────────────────
+function scheduleReminderChecks() {
+  setInterval(() => {
+    const now = new Date();
+    tasks.forEach(t => {
+      if (t.reminder_at && !t.completed) {
+        const rd = new Date(t.reminder_at);
+        const diff = rd - now;
+        if (diff > 0 && diff < 60000) {
+          if (Notification.permission === 'granted') {
+            new Notification('LnkStash Reminder', { body: t.title, icon: '/favicon.ico' });
+          } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(p => {
+              if (p === 'granted') new Notification('LnkStash Reminder', { body: t.title });
+            });
+          }
+          showToast('⏰ Reminder: ' + t.title);
+        }
+      }
+    });
+  }, 30000);
+}
+
+function renderCardsOnly() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const grid = document.getElementById('cardsGrid');
+  const isTagFilter = currentFilter.startsWith('tag:');
+  const activeTag = isTagFilter ? currentFilter.slice(4) : null;
+  const filtered = links.filter(l => {
+    const matchType = isTagFilter ? (l.tags||[]).includes(activeTag) :
+      currentFilter === 'all' ? true :
+      currentFilter === 'favorites' ? favorites.has(l.id) :
+      currentFilter === 'tasks' ? false :
+      l.type === currentFilter;
+    const matchSearch = !search || l.title.toLowerCase().includes(search) || l.url.toLowerCase().includes(search) || (l.notes||'').toLowerCase().includes(search) || (l.tags||[]).some(t => t.toLowerCase().includes(search));
+    return matchType && matchSearch;
+  });
+  document.getElementById('count-all').textContent = links.length;
+  document.getElementById('count-favorites').textContent = links.filter(l => favorites.has(l.id)).length;
+  ['doc','app','social','link'].forEach(t => { document.getElementById('count-'+t).textContent = links.filter(l => l.type === t).length; });
+  grid.innerHTML = '';
+  if (!filtered.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.innerHTML = '<div class="empty-icon">📭</div><div class="empty-title">' + (links.length === 0 ? 'Your stash is empty' : 'No links found') + '</div><div style="font-size:12px">' + (links.length === 0 ? 'Click "Add Link" to save your first link' : 'Try a different search or filter') + '</div>';
+    grid.appendChild(empty);
+    return;
+  }
+  filtered.forEach((l, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.animationDelay = (i * 0.04) + 's';
+    card.dataset.id = l.id;
+    const domain = getDomain(l.url);
+    const favicon = getSmartFavicon(l.url, l.type);
+    card.style.cursor = 'pointer';
+    card.innerHTML =
+      '<div class="card-top"><div class="card-favicon" data-emoji="' + (EMOJIS[l.type]||'🔗') + '"><img src="' + favicon + '" width="20" height="20" style="border-radius:4px"></div>' +
+      '<div class="card-meta"><div class="card-title">' + esc(l.title) + '</div>' +
+      '<div class="card-url">' + esc(getDomain(l.url)) + '</div></div></div>' +
+      (l.notes ? '<div class="card-notes">' + esc(l.notes) + '</div>' : '') +
+      '<div class="card-footer"><div class="card-tags">' + (l.tags||[]).slice(0,3).map(t => '<span class="tag-pill">' + esc(t) + '</span>').join('') + '</div>' +
+      '<div style="display:flex;align-items:center;gap:6px">' +
+      '<span class="card-type-badge badge-' + l.type + '">' + TYPE_LABELS[l.type] + '</span>' +
+      '<button class="card-fav-btn" title="Favorite" data-fav="' + (favorites.has(l.id)?'1':'0') + '">' + (favorites.has(l.id) ? '★' : '☆') + '</button>' +
+      '<button class="card-edit-btn" title="Edit">✎</button>' +
+      '</div></div></div>';
+    card.addEventListener('click', function() {
+      let href = l.url;
+      if (href && !href.startsWith('http://') && !href.startsWith('https://')) { href = 'https://' + href; }
+      window.open(href, '_blank', 'noopener,noreferrer');
+    });
+    const editBtnCard = card.querySelector('.card-edit-btn');
+    if (editBtnCard) {
+      editBtnCard.addEventListener('click', function(e) { e.stopPropagation(); editLink(l.id); });
+    }
+    const favBtnCard = card.querySelector('.card-fav-btn');
+    if (favBtnCard) {
+      favBtnCard.addEventListener('click', function(e) { toggleFavorite(l.id, e); });
+    }
+
+    const faviconImg = card.querySelector('.card-favicon img');
+    if (faviconImg) {
+      faviconImg.addEventListener('error', function() {
+        const wrap = this.parentNode;
+        this.remove();
+        wrap.textContent = wrap.dataset.emoji || '🔗';
+      });
+    }
+    grid.appendChild(card);
+  });
+}
+
+function renderCards() {
+  renderFiltersBar();
+  renderSidebarTags();
+  renderCardsOnly();
+}
+
+function renderFiltersBar() {
+  const bar = document.getElementById('filtersBar');
+  if (!bar) return;
+  // Build tag counts from both links and tasks
+  const tagMap = {};
+  links.forEach(l => (l.tags||[]).forEach(t => { tagMap[t] = (tagMap[t]||0)+1; }));
+  tasks.forEach(t => (t.tags||[]).forEach(tag => { tagMap[tag] = (tagMap[tag]||0)+1; }));
+  const sortedTags = Object.entries(tagMap).sort((a,b) => b[1]-a[1]);
+  bar.innerHTML = '';
+  // Always show Favorites first
+  const favEl = document.createElement('div');
+  favEl.className = 'filter-tag' + (currentFilter === 'favorites' ? ' active' : '');
+  favEl.id = 'filter-favorites';
+  favEl.innerHTML = '<span class="tag-dot" style="background:#ffd43b"></span>Favorites';
+  favEl.addEventListener('click', () => filterType('favorites'));
+  bar.appendChild(favEl);
+  // Then tags by count (biggest first)
+  sortedTags.forEach(([tag, count]) => {
+    const el = document.createElement('div');
+    el.className = 'filter-tag' + (currentFilter === 'tag:'+tag ? ' active' : '');
+    el.innerHTML = '<span style="font-family:monospace;font-size:10px">#</span>' + tag + ' <span style="opacity:.5;font-size:10px">' + count + '</span>';
+    el.addEventListener('click', () => filterTag(tag));
+    bar.appendChild(el);
+  });
+}
+
+function renderSidebarTags() {
+  const tagMap = {};
+  links.forEach(l => (l.tags||[]).forEach(t => { tagMap[t] = (tagMap[t]||0)+1; }));
+  tasks.forEach(t => (t.tags||[]).forEach(tag => { tagMap[tag] = (tagMap[tag]||0)+1; }));
+  const sorted = Object.entries(tagMap).sort((a,b) => b[1]-a[1]);
+  const el = document.getElementById('sidebarTags');
+  el.innerHTML = '';
+  if (!sorted.length) {
+    el.innerHTML = '<div style="padding:6px 8px;font-size:11px;color:var(--text-muted);font-family:IBM Plex Mono,monospace">No tags yet</div>';
+    return;
+  }
+  sorted.forEach(([tag, count]) => {
+    const active = currentFilter === 'tag:' + tag;
+    const item = document.createElement('div');
+    item.className = 'sidebar-item' + (active ? ' active' : '');
+    item.innerHTML =
+      '<span style="font-family:IBM Plex Mono,monospace;font-size:11px;color:' + (active ? 'var(--teal)' : 'var(--text-muted)') + '">#</span>' +
+      '<span style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(tag) + '</span>' +
+      '<span class="sidebar-count">' + count + '</span>';
+    item.addEventListener('click', function() { filterTag(tag); closeSidebar(); });
+    el.appendChild(item);
+  });
+}
+
+// ── MOBILE SIDEBAR ────────────────────────────────────────────────────
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function filterType(type) {
+  currentFilter = type;
+  currentSection = 'links';
+  // Always switch to links view
+  document.getElementById('cardsGrid').style.display = 'grid';
+  document.getElementById('filtersBar').style.display = 'flex';
+  document.getElementById('tasksSection').style.display = 'none';
+  document.getElementById('statsSection').style.display = 'none';
+  document.getElementById('topbarAddLabel').textContent = 'Add Link';
+  // Update active states
+  document.querySelectorAll('.filter-tag').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active'));
+  const filterEl = document.getElementById('filter-'+type);
+  if (filterEl) filterEl.classList.add('active');
+  const navEl = document.getElementById('nav-'+type);
+  if (navEl) navEl.classList.add('active');
+  const bnavEl = document.getElementById('bnav-'+type);
+  if (bnavEl) bnavEl.classList.add('active');
+  const titles = {all:'All Links',favorites:'Favorites',doc:'Docs',app:'Apps',social:'Social Posts',link:'Links'};
+  const subs = {all:'Your saved resources, synced across all devices',favorites:'Your starred links',doc:'Documentation and references',app:'Apps and tools',social:'Social media posts and threads',link:'Articles and general links'};
+  document.getElementById('pageTitle').textContent = titles[type] || type;
+  document.getElementById('pageSubtitle').textContent = subs[type]||'';
+  renderSidebarTags(); renderFiltersBar(); renderCards();
+}
+
+function filterTag(tag) {
+  currentFilter = 'tag:' + tag;
+  currentSection = 'tag';
+  // Clear active states
+  document.querySelectorAll('.filter-tag').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active'));
+  // Set page title
+  document.getElementById('pageTitle').textContent = '#' + tag;
+  document.getElementById('pageSubtitle').textContent = 'Links & tasks tagged with "' + tag + '"';
+  document.getElementById('topbarAddLabel').textContent = 'Add Link';
+  // Show both sections explicitly
+  document.getElementById('cardsGrid').style.display = 'grid';
+  document.getElementById('filtersBar').style.display = 'flex';
+  document.getElementById('tasksSection').style.display = 'block';
+  // Render everything
+  renderSidebarTags();
+  renderFiltersBar();
+  renderCardsOnly();
+  renderTasks();
+}
+
+function openAdd() {
+  editingId = null;
+  ['f-url','f-title','f-notes','f-tags'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-type').value = 'link';
+  document.getElementById('addModalTitle').textContent = '// add_new_link';
+  document.getElementById('saveBtn').textContent = 'Save Link';
+  document.getElementById('deleteEditBtn').style.display = 'none';
+  document.getElementById('addModal').classList.add('open');
+  setTimeout(() => document.getElementById('f-url').focus(), 150);
+}
+function closeAdd() { document.getElementById('addModal').classList.remove('open'); }
+function autoFillTitle() {
+  const url = document.getElementById('f-url').value;
+  const titleEl = document.getElementById('f-title');
+  if (url) { try { titleEl.placeholder = new URL(url).hostname.replace('www.',''); } catch(e){} }
+}
+
+async function fetchMeta() {
+  const url = document.getElementById('f-url').value.trim();
+  if (!url) return;
+  try { new URL(url); } catch(e) { return; }
+  const titleEl = document.getElementById('f-title');
+  const notesEl = document.getElementById('f-notes');
+  try {
+    const res = await fetch('https://api.microlink.io/?url=' + encodeURIComponent(url));
+    const data = await res.json();
+    if (data.status === 'success') {
+      if (!titleEl.value && data.data.title) { titleEl.value = data.data.title; }
+      if (!notesEl.value && data.data.description) { notesEl.value = data.data.description; }
+    }
+  } catch(e) { /* silently fail */ }
+}
+
+function openDetail(id) {
+  const l = links.find(x => String(x.id) === String(id));
+  if (!l) return;
+  document.getElementById('d-title-header').textContent = '// ' + l.title.toLowerCase().replace(/\s+/g,'_').slice(0,30);
+  document.getElementById('detailBody').innerHTML =
+    '<div class="detail-url-bar"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--teal)" stroke-width="1.5"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h8a1 1 0 001-1V7M7 1h4m0 0v4m0-4L5 7"/></svg><a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.url) + '</a></div>' +
+    '<div class="connection-line"><span class="conn-badge">' + esc(getDomain(l.url)) + '</span><span class="conn-pill">' + TYPE_LABELS[l.type] + '</span><span class="conn-pill">Encrypted</span><span class="conn-pill" style="color:var(--teal)">Synced</span><span class="conn-pill">' + formatDate(l.created_at) + '</span></div>' +
+    (l.notes ? '<div style="font-family:IBM Plex Mono,monospace;font-size:10px;color:var(--text-muted);margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase">Notes</div><div class="detail-notes">' + esc(l.notes) + '</div>' : '') +
+    ((l.tags||[]).length ? '<div style="font-family:IBM Plex Mono,monospace;font-size:10px;color:var(--text-muted);margin-bottom:8px;letter-spacing:.05em;text-transform:uppercase">Tags</div><div style="display:flex;gap:6px;flex-wrap:wrap">' + l.tags.map(t => '<span class="tag-pill" style="font-size:11px">' + esc(t) + '</span>').join('') + '</div>' : '');
+
+  const footer = document.getElementById('detailFooter');
+  footer.innerHTML = '';
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn';
+  delBtn.textContent = 'Delete';
+  delBtn.style.cssText = 'color:#f03e3e;border-color:rgba(240,62,62,.2)';
+  delBtn.addEventListener('click', function() { deleteLink(l.id); });
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'btn';
+  editBtn.textContent = 'Edit';
+  editBtn.addEventListener('click', function() { editLink(l.id); });
+
+  const openBtn = document.createElement('button');
+  openBtn.className = 'btn btn-primary';
+  openBtn.textContent = 'Open Link ↗';
+  openBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    let href = l.url;
+    if (href && !href.startsWith('http://') && !href.startsWith('https://')) { href = 'https://' + href; }
+    window.open(href, '_blank', 'noopener,noreferrer');
+  });
+
+  footer.appendChild(delBtn);
+  footer.appendChild(editBtn);
+  footer.appendChild(openBtn);
+
+  document.getElementById('detailModal').classList.add('open');
+}
+function closeDetail() { document.getElementById('detailModal').classList.remove('open'); }
+
+function editLink(id) {
+  const l = links.find(x => String(x.id) === String(id));
+  if (!l) return;
+  closeDetail(); editingId = id;
+  document.getElementById('f-url').value = l.url;
+  document.getElementById('f-title').value = l.title;
+  document.getElementById('f-notes').value = l.notes||'';
+  document.getElementById('f-tags').value = (l.tags||[]).join(', ');
+  document.getElementById('f-type').value = l.type;
+  document.getElementById('addModalTitle').textContent = '// edit_link';
+  document.getElementById('saveBtn').textContent = 'Update Link';
+  document.getElementById('deleteEditBtn').style.display = 'block';
+  document.getElementById('addModal').classList.add('open');
+}
+
+function deleteCurrentEdit() {
+  if (!editingId) return;
+  const l = links.find(x => String(x.id) === String(editingId));
+  if (confirm('Delete "' + (l ? l.title : 'this link') + '"?')) {
+    closeAdd();
+    deleteLink(editingId);
+    editingId = null;
+  }
+}
+
+function getDomain(url) { try { return new URL(url).hostname.replace('www.',''); } catch(e) { return url; } }
+
+function getSmartFavicon(url, type) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname;
+    // App Store — extract app name slug from path e.g. /app/notion/id...
+    if (host === 'apps.apple.com') {
+      const parts = u.pathname.split('/').filter(Boolean);
+      // find the app name (comes after /app/)
+      const appIdx = parts.indexOf('app');
+      const appName = appIdx >= 0 && parts[appIdx+1] ? parts[appIdx+1] : null;
+      if (appName) {
+        const knownApps = {
+          'notion': 'notion.so', 'spotify': 'spotify.com', 'slack': 'slack.com',
+          'figma': 'figma.com', 'linear': 'linear.app', 'discord': 'discord.com',
+          'telegram': 'telegram.org', 'whatsapp': 'whatsapp.com', 'instagram': 'instagram.com',
+          'twitter': 'twitter.com', 'x': 'x.com', 'tiktok': 'tiktok.com',
+          'youtube': 'youtube.com', 'netflix': 'netflix.com', 'zoom': 'zoom.us',
+          'dropbox': 'dropbox.com', 'evernote': 'evernote.com', 'todoist': 'todoist.com',
+          'trello': 'trello.com', 'asana': 'asana.com', 'github': 'github.com',
+          'gmail': 'gmail.com', 'chrome': 'google.com', 'safari': 'apple.com',
+          'airbnb': 'airbnb.com', 'uber': 'uber.com', 'lyft': 'lyft.com',
+          'amazon': 'amazon.com', 'ebay': 'ebay.com', 'paypal': 'paypal.com',
+          'robinhood': 'robinhood.com', 'coinbase': 'coinbase.com',
+          'duolingo': 'duolingo.com', 'headspace': 'headspace.com', 'calm': 'calm.com',
+        };
+        const key = appName.toLowerCase().split('-')[0];
+        // Skip if it looks like a numeric ID (id1234567890)
+        if (/^id\d+$/.test(key)) {
+          return 'https://www.google.com/s2/favicons?domain=apple.com&sz=64';
+        }
+        const mappedDomain = knownApps[key];
+        if (mappedDomain) {
+          return 'https://www.google.com/s2/favicons?domain=' + mappedDomain + '&sz=64';
+        }
+        // Try the app name as a .com domain
+        return 'https://www.google.com/s2/favicons?domain=' + key + '.com&sz=64';
+      }
+    }
+    // Play Store — extract app id
+    if (host === 'play.google.com') {
+      const appId = u.searchParams.get('id') || '';
+      // com.spotify.music → spotify.com
+      const parts2 = appId.split('.');
+      if (parts2.length >= 2) {
+        const appName2 = parts2[parts2.length - 1] !== 'music' && parts2[parts2.length - 1] !== 'android'
+          ? parts2[parts2.length - 1]
+          : parts2[parts2.length - 2];
+        return 'https://www.google.com/s2/favicons?domain=' + appName2 + '.com&sz=64';
+      }
+    }
+    // Default: use domain favicon
+    return 'https://www.google.com/s2/favicons?domain=' + host + '&sz=64';
+  } catch(e) {
+    return 'https://www.google.com/s2/favicons?domain=' + getDomain(url) + '&sz=64';
+  }
+}
+function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function formatDate(iso) {
+  if (!iso) return 'just now';
+  const d = new Date(iso), diff = Date.now()-d;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff/60000)+'m ago';
+  if (diff < 86400000) return Math.floor(diff/3600000)+'h ago';
+  if (diff < 604800000) return Math.floor(diff/86400000)+'d ago';
+  return d.toLocaleDateString();
+}
+function showToast(msg) { const t = document.getElementById('toast'); document.getElementById('toastMsg').textContent = msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+
+// ── STATS ─────────────────────────────────────────────────────
+let statsChart = null;
+let statsExpanded = false;
+let statsRateInterval = null;
+
+function toggleStatsExpand() {
+  statsExpanded = !statsExpanded;
+  const expanded = document.getElementById('statsExpanded');
+  const icon = document.getElementById('statsExpandIcon');
+  expanded.style.display = statsExpanded ? 'block' : 'none';
+  icon.style.transform = statsExpanded ? 'rotate(180deg)' : '';
+  if (statsExpanded) {
+    loadStatsChart(7, document.querySelector('.stats-period-btn.active'));
+  }
+}
+
+async function fetchUSDILS() {
+  try {
+    const res = await fetch('https://open.er-api.com/v6/latest/USD');
+    const data = await res.json();
+    if (data.result === 'success') return { rate: data.rates.ILS, time: data.time_last_update_utc };
+  } catch(e) {}
+  try {
+    const res2 = await fetch('https://api.frankfurter.app/latest?from=USD&to=ILS');
+    const data2 = await res2.json();
+    return { rate: data2.rates.ILS, time: new Date().toUTCString() };
+  } catch(e) {}
+  return null;
+}
+
+let lastStatsRate = null;
+async function loadStatsData() {
+  const data = await fetchUSDILS();
+  if (!data) return;
+
+  const rate = data.rate;
+  const prev = lastStatsRate;
+  lastStatsRate = rate;
+
+  const dir = prev ? (rate > prev ? 'up' : rate < prev ? 'down' : 'neutral') : 'neutral';
+  const change = prev ? rate - prev : 0;
+  const changePct = prev ? (change / prev * 100) : 0;
+
+  const rateEl = document.getElementById('statsRate');
+  rateEl.textContent = rate.toFixed(4);
+  rateEl.className = 'stats-rate ' + dir;
+
+  const changeEl = document.getElementById('statsChangeLine');
+  if (prev && change !== 0) {
+    const arrow = dir === 'up' ? '▲' : '▼';
+    changeEl.innerHTML = '<span class="stats-change-badge ' + dir + '">' + arrow + ' ' + Math.abs(change).toFixed(4) + ' (' + Math.abs(changePct).toFixed(3) + '%)</span>';
+  }
+
+  document.getElementById('statsMiniGrid').innerHTML =
+    '<div class="stats-mini-item"><div class="stats-mini-label">100 USD</div><div class="stats-mini-value">' + (rate*100).toFixed(2) + '</div><div class="stats-mini-sub">ILS</div></div>' +
+    '<div class="stats-mini-item"><div class="stats-mini-label">1,000 ILS</div><div class="stats-mini-value">' + (1000/rate).toFixed(2) + '</div><div class="stats-mini-sub">USD</div></div>' +
+    '<div class="stats-mini-item"><div class="stats-mini-label">Inverse</div><div class="stats-mini-value">' + (1/rate).toFixed(5) + '</div><div class="stats-mini-sub">USD per ILS</div></div>' +
+    '<div class="stats-mini-item"><div class="stats-mini-label">10,000 ILS</div><div class="stats-mini-value">' + (10000/rate).toFixed(2) + '</div><div class="stats-mini-sub">USD</div></div>';
+
+  document.getElementById('statsLastUpdated').textContent = '⏱ ' + new Date().toLocaleTimeString();
+
+  // Auto-refresh every 60s while stats section is open
+  if (statsRateInterval) clearInterval(statsRateInterval);
+  statsRateInterval = setInterval(() => {
+    if (currentSection === 'stats') loadStatsData();
+    else { clearInterval(statsRateInterval); statsRateInterval = null; }
+  }, 60000);
+}
+
+async function loadStatsChart(days, btnEl) {
+  document.querySelectorAll('.stats-period-btn').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  const fmt = d => d.toISOString().split('T')[0];
+  try {
+    const res = await fetch('https://api.frankfurter.app/' + fmt(start) + '..' + fmt(end) + '?from=USD&to=ILS');
+    const data = await res.json();
+    const labels = Object.keys(data.rates);
+    const values = labels.map(d => data.rates[d].ILS);
+    renderStatsChart(labels, values);
+  } catch(e) { console.error('Chart error:', e); }
+}
+
+function renderStatsChart(labels, values) {
+  const ctx = document.getElementById('statsChart').getContext('2d');
+  if (statsChart) statsChart.destroy();
+  const isUp = values[values.length-1] >= values[0];
+  const lineColor = isUp ? '#14d09a' : '#f03e3e';
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  statsChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values, borderColor: lineColor, borderWidth: 2,
+        pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: lineColor,
+        fill: true,
+        backgroundColor: (c) => {
+          const g = c.chart.ctx.createLinearGradient(0,0,0,180);
+          g.addColorStop(0, isUp ? 'rgba(20,208,154,0.15)' : 'rgba(240,62,62,0.15)');
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          return g;
+        },
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1c1e21', borderColor: '#242628', borderWidth: 1,
+          titleColor: '#7a7e85', bodyColor: '#e8eaed',
+          titleFont: { family: 'IBM Plex Mono', size: 10 },
+          bodyFont: { family: 'IBM Plex Mono', size: 12, weight: '600' },
+          callbacks: { title: i => i[0].label, label: i => ' ' + i.raw.toFixed(4) + ' ILS' }
+        }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#4a4e55', font: { family: 'IBM Plex Mono', size: 9 }, maxTicksLimit: 5, maxRotation: 0 }, border: { color: '#242628' } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4a4e55', font: { family: 'IBM Plex Mono', size: 9 }, callback: v => v.toFixed(3) }, border: { color: '#242628' }, min: min*0.998, max: max*1.002 }
+      }
+    }
+  });
+}
+
+document.getElementById('addModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeAdd(); });
+document.getElementById('detailModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDetail(); });
+document.getElementById('settingsModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeSettings(); });
+document.getElementById('taskModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeTaskModal(); });
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') { closeAdd(); closeDetail(); closePicker(); }
+  if ((e.metaKey||e.ctrlKey) && e.key==='k') { e.preventDefault(); if(currentUser) toggleAddPicker({currentTarget: document.getElementById('topbarAddBtn'), stopPropagation:()=>{}}); }
+});
+document.addEventListener('click', () => closePicker());
+document.getElementById('authEmail').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('authPassword').focus(); });
+document.getElementById('authPassword').addEventListener('keydown', e => { if(e.key==='Enter') handleAuth(); });
+
+init();
+</script>
+</body>
+</html>
